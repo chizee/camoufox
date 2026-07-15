@@ -2,30 +2,39 @@ diff --git a/dom/animation/AnimationEffect.cpp b/dom/animation/AnimationEffect.c
 index 6ef8c30d49..07cad770c9 100644
 --- a/dom/animation/AnimationEffect.cpp
 +++ b/dom/animation/AnimationEffect.cpp
-@@ -108,10 +108,18 @@ ComputedTiming AnimationEffect::GetComputedTimingAt(
+@@ -13,6 +13,7 @@
+ #include "mozilla/dom/MutationObservers.h"
+ #include "mozilla/dom/ScrollTimeline.h"  // For PROGRESS_TIMELINE_DURATION_MILLISEC
+ #include "nsDOMMutationObserver.h"
++#include "MaskConfig.hpp"
+
+ namespace mozilla::dom {
+
+@@ -108,10 +109,19 @@ ComputedTiming AnimationEffect::GetComputedTimingAt(
    // Always return the same object to benefit from return-value optimization.
    ComputedTiming result;
- 
+
 +  result.mActiveDuration = aTiming.ActiveDuration();
    if (aTiming.Duration()) {
      MOZ_ASSERT(aTiming.Duration().ref() >= zeroDuration,
                 "Iteration duration should be positive");
 -    result.mDuration = aTiming.Duration().ref();
-+    if (result.mActiveDuration != StickyTimeDuration::Forever()) {
-+      // On css animations with finite duration, set the duration & active duration to 0
++    // Camoufox: finite CSS animations complete instantly so Playwright doesn't
++    // wait on them. `disableInstantAnimations` restores normal animation timing.
++    if (MaskConfig::GetBool("disableInstantAnimations") ||
++        result.mActiveDuration == StickyTimeDuration::Forever()) {
++      result.mDuration = aTiming.Duration().ref();
++    } else {
 +      result.mDuration = zeroDuration;
 +      result.mActiveDuration = zeroDuration;
-+    } else {
-+      // On infinite-running animations, use the default duration
-+      result.mDuration = aTiming.Duration().ref();
 +    }
    }
- 
+
    MOZ_ASSERT(aTiming.Iterations() >= 0.0 && !std::isnan(aTiming.Iterations()),
-@@ -124,7 +132,6 @@ ComputedTiming AnimationEffect::GetComputedTimingAt(
+@@ -124,7 +134,6 @@ ComputedTiming AnimationEffect::GetComputedTimingAt(
               "ValidateIterationStart");
    result.mIterationStart = aTiming.IterationStart();
- 
+
 -  result.mActiveDuration = aTiming.ActiveDuration();
    result.mEndTime = aTiming.EndTime();
    result.mFill = aTiming.Fill() == dom::FillMode::Auto ? dom::FillMode::None
